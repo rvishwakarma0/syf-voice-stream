@@ -4,7 +4,7 @@ let mediaRecorder;
 let wsManager;
 
 async function startStreaming() {
-    wsManager = new WebSocketEventManager('ws://localhost:8081/interact-s2s');
+    wsManager = new WebSocketEventManager('ws://3.82.22.210:8081/interact-s2s');
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
