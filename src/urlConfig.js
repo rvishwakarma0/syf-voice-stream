@@ -1,0 +1,1 @@
+export const WEBHOOK_BASE_URL = "ws://3.82.22.210:8081";
