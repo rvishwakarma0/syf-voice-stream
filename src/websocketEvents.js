@@ -1,13 +1,14 @@
 import AudioPlayer from "./lib/play/AudioPlayer";
 import ChatHistoryManager from "./lib/util/ChatHistoryManager.js";
+import { GET_TPO_BY_ID } from "./urlConfig.js";
 
 const audioPlayer = new AudioPlayer();
 
 export class WebSocketEventManager {
+    
     constructor(wsUrl) {
-    const urlParams = new URLSearchParams(window.location.search);
-        this.data = urlParams.get('data');
-        console.log('data:', this.data);
+        const urlParams = new URLSearchParams(window.location.search);
+        this.tpodId = urlParams.get('tpodId');
         this.wsUrl = wsUrl;
         this.promptName = null;
         this.audioContentName = null;
@@ -363,9 +364,10 @@ export class WebSocketEventManager {
         };
         this.sendEvent(contentStartEvent);
 
-        const systemPrompt = "You are a friend. The user and you will engage in a spoken " +
-            "dialog exchanging the transcripts of a natural real-time conversation. Keep your responses short, " +
-            "generally two or three sentences for chatty scenarios.";
+        fetch(`${GET_TPO_BY_ID}/${this.tpodId}`)
+        .then(response => response.json())
+        .then(data => {
+        const systemPrompt = data.personaPrompt;
 
         const textInputEvent = {
             event: {
@@ -388,6 +390,11 @@ export class WebSocketEventManager {
         };
         this.sendEvent(contentEndEvent);
         this.startAudioContent();
+
+    })
+    .catch(error => {
+      console.error('Error fetching personaPrompt:', error);
+    });
     }
 
     startAudioContent() {
