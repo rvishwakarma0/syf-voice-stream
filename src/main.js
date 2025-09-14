@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './urlConfig.js';
+import { WEBHOOK_BASE_URL } from './urlConfig.js';
 import { WebSocketEventManager } from './websocketEvents.js';
 
 let mediaRecorder;
