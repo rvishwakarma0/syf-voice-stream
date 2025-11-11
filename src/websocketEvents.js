@@ -60,11 +60,11 @@ export class WebSocketEventManager {
         // Map roles to display names and IDs
         let toastId, displayName;
         if (role === 'user') {
-            toastId = 'toast-customer';
-            displayName = 'CUSTOMER';
-        } else if (role === 'assistant') {
             toastId = 'toast-trainee';
             displayName = 'TRAINEE';
+        } else if (role === 'assistant') {
+            toastId = 'toast-customer';
+            displayName = 'CUSTOMER';
         } else {
             // Skip system messages or other roles
             return;
