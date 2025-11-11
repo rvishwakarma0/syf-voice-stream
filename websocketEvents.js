@@ -1,5 +1,6 @@
 import AudioPlayer from "./lib/play/AudioPlayer";
 import ChatHistoryManager from "./lib/util/ChatHistoryManager.js";
+import { FeedbackManager } from './src/feedbackManager.js';
 
 const audioPlayer = new AudioPlayer();
 
@@ -15,6 +16,7 @@ export class WebSocketEventManager {
         this.role = null;
         this.chat = { history: [] };
         this.chatRef = { current: this.chat };
+        this.feedbackManager = new FeedbackManager();
 
         this.chatHistoryManager = ChatHistoryManager.getInstance(
             this.chatRef,
@@ -227,6 +229,13 @@ export class WebSocketEventManager {
                 message: data.content
             };
             this.chatHistoryManager.addTextMessage(messageData);
+            
+            // Track messages for sentiment feedback
+            if (data.role === 'USER') {
+                this.feedbackManager.setCustomerMessage(data.content);
+            } else if (data.role === 'ASSISTANT') {
+                this.feedbackManager.setAgentMessage(data.content);
+            }
         }
     }
 
@@ -474,5 +483,6 @@ export class WebSocketEventManager {
             }
         }
         this.chatHistoryManager.endConversation();
+        this.feedbackManager.reset();
     }
 }

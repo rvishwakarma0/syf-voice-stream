@@ -1,6 +1,7 @@
 import AudioPlayer from "./lib/play/AudioPlayer";
 import ChatHistoryManager from "./lib/util/ChatHistoryManager.js";
 import { GET_TPO_BY_ID } from "./urlConfig.js";
+import { FeedbackManager } from './feedbackManager.js';
 
 const audioPlayer = new AudioPlayer();
 
@@ -19,6 +20,7 @@ export class WebSocketEventManager {
         this.role = null;
         this.chat = { history: [] };
         this.chatRef = { current: this.chat };
+        this.feedbackManager = new FeedbackManager();
 
         this.chatHistoryManager = ChatHistoryManager.getInstance(
             this.chatRef,
@@ -255,6 +257,20 @@ export class WebSocketEventManager {
                 message: data.content
             };
             this.chatHistoryManager.addTextMessage(messageData);
+            
+            // Track messages for sentiment feedback
+            // NOTE: In Nova Sonic, USER = trainee/agent speaking, ASSISTANT = customer/AI response
+            // So we need to SWAP the roles for our sentiment API
+            console.log("🎯 Message role detected:", data.role); // DEBUG
+            if (data.role === 'USER') {
+                // USER in Nova Sonic = Agent/Trainee speaking
+                console.log("🎧 Setting AGENT message (YOU speaking) - will trigger API"); // DEBUG
+                this.feedbackManager.setAgentMessage(data.content);
+            } else if (data.role === 'ASSISTANT') {
+                // ASSISTANT in Nova Sonic = Customer/AI response
+                console.log("👤 Setting CUSTOMER message (AI/customer speaking)"); // DEBUG
+                this.feedbackManager.setCustomerMessage(data.content);
+            }
         }
     }
 
@@ -456,5 +472,6 @@ export class WebSocketEventManager {
             }
         }
         this.chatHistoryManager.endConversation();
+        this.feedbackManager.reset();
     }
 }

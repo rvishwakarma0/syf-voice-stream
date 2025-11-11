@@ -1,17 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Audio Streaming to Bedrock</title>
+  <title>Voice Training with Real-time Feedback</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
 <div id="app">
   <div id="status" class="disconnected">Disconnected</div>
-  <div id="chat-container"></div>
-  <div id="controls">
-    <button id="start" class="button">Start Streaming</button>
-    <button id="stop" class="button" disabled>Stop Streaming</button>
+  
+  <!-- MAIN CONTAINER WITH 80-20 SPLIT -->
+  <div id="main-container">
+    
+    <!-- LEFT SIDE: CONVERSATION (80%) -->
+    <div id="conversation-section">
+      <div id="chat-container"></div>
+      <div id="controls">
+        <button id="start" class="button">Start Streaming</button>
+        <button id="stop" class="button" disabled>Stop Streaming</button>
+      </div>
+    </div>
+    
+    <!-- RIGHT SIDE: FEEDBACK (20%) -->
+    <div id="feedback-section">
+      
+      <!-- UPDATE INDICATOR -->
+      <div id="update-badge" class="update-badge hidden">
+        &#x1F504; NEW FEEDBACK
+      </div>
+      
+      <!-- SENTIMENT ANALYSIS BOX -->
+      <div id="sentiment-box" class="feedback-box">
+        <div class="feedback-header">
+          <span class="feedback-title">Sentiment</span>
+        </div>
+        <div id="sentiment-content" class="feedback-content">
+          <p class="placeholder-text">Speak to get feedback...</p>
+        </div>
+      </div>
+      
+      <!-- SUGGESTION BOX -->
+      <div id="suggestion-box" class="feedback-box">
+        <div class="feedback-header">
+          <span class="feedback-title">Call Quality Evaluation</span>
+        </div>
+        <div id="suggestion-content" class="feedback-content">
+          <p class="placeholder-text">Waiting for your response...</p>
+        </div>
+      </div>
+      
+      <!-- SOP TO FOLLOW BOX -->
+      <div id="sop-box" class="feedback-box" style="display: none;">
+        <div class="feedback-header">
+          <span class="feedback-title">SOP to Follow</span>
+        </div>
+        <div id="sop-content" class="feedback-content">
+          <div style="white-space: pre-wrap;">&#x2705; Customer identity verification
+&#x2705; Check payment due
+&#x2705; Last activity for this account</div>
+        </div>
+      </div>
+      
+    </div>
+    
   </div>
 </div>
 <script type="module" src="/src/main.js"></script>
