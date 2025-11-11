@@ -18,6 +18,7 @@ export class WebSocketEventManager {
         this.chat = { history: [] };
         this.chatRef = { current: this.chat };
         this.feedbackManager = new FeedbackManager();
+        this.toastTimers = {}; // Store timeout IDs for auto-dismiss
 
         this.chatHistoryManager = ChatHistoryManager.getInstance(
             this.chatRef,
@@ -56,37 +57,73 @@ export class WebSocketEventManager {
             return;
         }
 
-        // Create toast element
-        const toast = document.createElement('div');
-        toast.className = `toast ${role}`;
-
-        // Add role label
-        const roleLabel = document.createElement('div');
-        roleLabel.className = 'toast-role';
-        roleLabel.textContent = role.toUpperCase();
-        
-        // Add message content
-        const content = document.createElement('div');
-        content.className = 'toast-content';
-        content.textContent = message || "No content";
-
-        toast.appendChild(roleLabel);
-        toast.appendChild(content);
-
-        // Add to container
-        toastContainer.appendChild(toast);
-        console.log(`[Toast] Toast added to DOM. Total toasts: ${toastContainer.children.length}`);
-
-        // Remove toast after 5 seconds
-        setTimeout(() => {
-            toast.remove();
-        }, 5000);
-
-        // Limit number of toasts to 3
-        const toasts = toastContainer.querySelectorAll('.toast');
-        if (toasts.length > 3) {
-            toasts[0].remove();
+        // Map roles to display names and IDs
+        let toastId, displayName;
+        if (role === 'user') {
+            toastId = 'toast-customer';
+            displayName = 'CUSTOMER';
+        } else if (role === 'assistant') {
+            toastId = 'toast-trainee';
+            displayName = 'TRAINEE';
+        } else {
+            // Skip system messages or other roles
+            return;
         }
+
+        // Check if toast already exists
+        let toast = document.getElementById(toastId);
+        
+        if (!toast) {
+            // Create new toast element
+            toast = document.createElement('div');
+            toast.id = toastId;
+            toast.className = `toast ${role}`;
+
+            // Add role label
+            const roleLabel = document.createElement('div');
+            roleLabel.className = 'toast-role';
+            roleLabel.textContent = displayName;
+            
+            // Add message content
+            const content = document.createElement('div');
+            content.className = 'toast-content';
+            content.textContent = message || "No content";
+
+            toast.appendChild(roleLabel);
+            toast.appendChild(content);
+
+            // Add to container
+            toastContainer.appendChild(toast);
+            console.log(`[Toast] Created new ${displayName} toast`);
+        } else {
+            // Update existing toast content
+            const content = toast.querySelector('.toast-content');
+            if (content) {
+                content.textContent = message || "No content";
+                console.log(`[Toast] Updated ${displayName} toast content`);
+                
+                // Add update animation
+                toast.classList.remove('toast-update');
+                void toast.offsetWidth; // Trigger reflow
+                toast.classList.add('toast-update');
+            }
+        }
+
+        // Clear existing timeout for this toast
+        if (this.toastTimers[toastId]) {
+            clearTimeout(this.toastTimers[toastId]);
+        }
+
+        // Set new timeout to remove toast after 10 seconds
+        this.toastTimers[toastId] = setTimeout(() => {
+            if (toast && toast.parentNode) {
+                toast.classList.add('toast-fadeout');
+                setTimeout(() => {
+                    toast.remove();
+                    delete this.toastTimers[toastId];
+                }, 300); // Wait for fade animation
+            }
+        }, 10000);
     }
 
 

@@ -128,7 +128,7 @@ function stopStreaming() {
 
 function startCallTimer() {
     // Start from -5 minutes (-300 seconds)
-    const startSeconds = -20;
+    const startSeconds = -300;
     callStartTime = Date.now();
     
     callTimer = setInterval(() => {
