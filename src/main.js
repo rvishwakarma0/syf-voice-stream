@@ -3,11 +3,39 @@ import { WebSocketEventManager } from './websocketEvents.js';
 
 let mediaRecorder;
 let wsManager;
+let callTimer;
+let callStartTime;
+
+function updateCallStatus(status) {
+    const statusIndicator = document.getElementById('call-status');
+    if (statusIndicator) {
+        statusIndicator.setAttribute('data-status', status);
+    }
+}
 
 async function startStreaming() {
-    wsManager = new WebSocketEventManager(`${WEBHOOK_BASE_URL}/interact-s2s`);
+    console.log('[Main] Starting streaming...');
+    updateCallStatus('disconnected');
+    
+    // Create WebSocket manager with connection callbacks
+    console.log(`[Main] Connecting to WebSocket: ${WEBHOOK_BASE_URL}/interact-s2s`);
+    wsManager = new WebSocketEventManager(`${WEBHOOK_BASE_URL}/interact-s2s`, {
+        onConnect: () => {
+            console.log('[Main] WebSocket connected callback');
+            updateCallStatus('connected');
+        },
+        onDisconnect: (event) => {
+            console.log('[Main] WebSocket disconnected callback:', event);
+            updateCallStatus('disconnected');
+        },
+        onError: (event) => {
+            console.error('[Main] WebSocket error callback:', event);
+            updateCallStatus('error');
+        }
+    });
 
     try {
+        console.log('[Main] Requesting microphone access...');
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
                 channelCount: 1,           // Mono
@@ -18,6 +46,7 @@ async function startStreaming() {
                 autoGainControl: true      // Enable automatic gain control
             }
         });
+        console.log('[Main] Microphone access granted');
 
         // Create AudioContext for processing
         const audioContext = new AudioContext({
@@ -55,8 +84,8 @@ async function startStreaming() {
             }
         };
 
-        document.getElementById("start").disabled = true;
-        document.getElementById("stop").disabled = false;
+        // Start call timer
+        startCallTimer();
 
         // Store cleanup functions
         window.audioCleanup = () => {
@@ -67,6 +96,7 @@ async function startStreaming() {
 
     } catch (error) {
         console.error("Error accessing microphone:", error);
+        updateCallStatus('error');
     }
 }
 
@@ -80,19 +110,70 @@ function stopStreaming() {
         wsManager.cleanup();
     }
 
-    document.getElementById("start").disabled = false;
-    document.getElementById("stop").disabled = true;
+    // Stop call timer
+    stopCallTimer();
+    
+    // Update status
+    updateCallStatus('disconnected');
+    
+    // Call parent window method to navigate to feedback section
+    // Using postMessage for cross-origin communication
+    try {
+        window.parent.postMessage({ action: 'endSession' }, '*');
+        console.log('Session ended - sent message to parent');
+    } catch (error) {
+        console.error('Error calling parent method:', error);
+    }
 }
 
-// Event listeners
+function startCallTimer() {
+    // Start from -5 minutes (-300 seconds)
+    const startSeconds = -20;
+    callStartTime = Date.now();
+    
+    callTimer = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+        const currentSeconds = startSeconds + elapsed;
+        
+        // Auto-end session when timer reaches 0
+        if (currentSeconds >= 0) {
+            stopStreaming();
+            return;
+        }
+        
+        // Calculate absolute values for display
+        const absSeconds = Math.abs(currentSeconds);
+        const minutes = Math.floor(absSeconds / 60);
+        const seconds = absSeconds % 60;
+        
+        // Display with negative sign
+        document.getElementById("call-timer").textContent = 
+            `-${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }, 1000);
+}
+
+function stopCallTimer() {
+    if (callTimer) {
+        clearInterval(callTimer);
+        callTimer = null;
+    }
+    document.getElementById("call-timer").textContent = "-00:20";
+}
+
+// Auto-start streaming on page load
 document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("start").addEventListener("click", startStreaming);
-    document.getElementById("stop").addEventListener("click", stopStreaming);
+    // Start streaming automatically
+    startStreaming();
 });
 
 // Ensure audio context is resumed after user interaction
 document.addEventListener('click', () => {
-    if (wsManager && wsManager.audioContext.state === 'suspended') {
+    if (wsManager && wsManager.audioContext && wsManager.audioContext.state === 'suspended') {
         wsManager.audioContext.resume();
     }
 }, { once: true });
+
+// Handle page unload to cleanup
+window.addEventListener('beforeunload', () => {
+    stopStreaming();
+});

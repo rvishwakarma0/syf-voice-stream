@@ -5,8 +5,9 @@ import { FeedbackManager } from './src/feedbackManager.js';
 const audioPlayer = new AudioPlayer();
 
 export class WebSocketEventManager {
-    constructor(wsUrl) {
+    constructor(wsUrl, callbacks = {}) {
         this.wsUrl = wsUrl;
+        this.callbacks = callbacks;
         this.promptName = null;
         this.audioContentName = null;
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -31,43 +32,61 @@ export class WebSocketEventManager {
     }
 
     updateChatUI() {
-        const chatContainer = document.getElementById('chat-container');
-        if (!chatContainer) {
-            console.error("Chat container not found");
+        // Get the latest message from history
+        if (this.chat.history.length === 0) return;
+        
+        const latestItem = this.chat.history[this.chat.history.length - 1];
+        
+        if (latestItem.endOfConversation) {
+            this.showToast("Conversation ended", "system");
             return;
         }
 
-        // Clear existing chat messages
-        chatContainer.innerHTML = '';
+        if (latestItem.role && latestItem.message) {
+            this.showToast(latestItem.message, latestItem.role.toLowerCase());
+        }
+    }
 
-        // Add all messages from history
-        this.chat.history.forEach(item => {
-            if (item.endOfConversation) {
-                const endDiv = document.createElement('div');
-                endDiv.className = 'message system';
-                endDiv.textContent = "Conversation ended";
-                chatContainer.appendChild(endDiv);
-                return;
-            }
+    showToast(message, role) {
+        console.log(`[Toast] Showing toast - Role: ${role}, Message: ${message?.substring(0, 50)}...`);
+        
+        const toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            console.error("Toast container not found");
+            return;
+        }
 
-            if (item.role) {
-                const messageDiv = document.createElement('div');
-                const roleLowerCase = item.role.toLowerCase();
-                messageDiv.className = `message ${roleLowerCase}`;
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.className = `toast ${role}`;
 
-                const roleLabel = document.createElement('div');
-                roleLabel.className = 'role-label';
-                roleLabel.textContent = item.role;
-                messageDiv.appendChild(roleLabel);
+        // Add role label
+        const roleLabel = document.createElement('div');
+        roleLabel.className = 'toast-role';
+        roleLabel.textContent = role.toUpperCase();
+        
+        // Add message content
+        const content = document.createElement('div');
+        content.className = 'toast-content';
+        content.textContent = message || "No content";
 
-                const content = document.createElement('div');
-                content.textContent = item.message || "No content";
-                messageDiv.appendChild(content);
+        toast.appendChild(roleLabel);
+        toast.appendChild(content);
 
-                chatContainer.appendChild(messageDiv);
-            }
-        });
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+        // Add to container
+        toastContainer.appendChild(toast);
+        console.log(`[Toast] Toast added to DOM. Total toasts: ${toastContainer.children.length}`);
+
+        // Remove toast after 5 seconds
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+
+        // Limit number of toasts to 3
+        const toasts = toastContainer.querySelectorAll('.toast');
+        if (toasts.length > 3) {
+            toasts[0].remove();
+        }
     }
 
 
@@ -76,6 +95,7 @@ export class WebSocketEventManager {
             this.socket.close();
         }
         this.socket = new WebSocket(this.wsUrl);
+        this.ws = this.socket; // Expose for external access
         this.setupSocketListeners();
     }
 
@@ -83,6 +103,7 @@ export class WebSocketEventManager {
         this.socket.onopen = () => {
             console.log("WebSocket Connected");
             this.updateStatus("Connected", "connected");
+            if (this.callbacks.onConnect) this.callbacks.onConnect();
             this.isProcessing = true;
             this.startSession();
             audioPlayer.start();
@@ -100,12 +121,14 @@ export class WebSocketEventManager {
         this.socket.onerror = (error) => {
             console.error("WebSocket Error:", error);
             this.updateStatus("Connection error", "error");
+            if (this.callbacks.onError) this.callbacks.onError();
             this.isProcessing = false;
         };
 
         this.socket.onclose = (event) => {
             console.log("WebSocket Disconnected", JSON.stringify(event));
             this.updateStatus("Disconnected", "disconnected");
+            if (this.callbacks.onDisconnect) this.callbacks.onDisconnect();
             this.isProcessing = false;
             audioPlayer.stop();
             if (this.isProcessing) {
@@ -256,11 +279,12 @@ export class WebSocketEventManager {
     }
 
     updateStatus(message, className) {
-        const statusDiv = document.getElementById('status');
-        if (statusDiv) {
-            statusDiv.textContent = message;
-            statusDiv.className = `status ${className}`;
+        // Update call status indicator instead of status div
+        const statusIndicator = document.getElementById('call-status');
+        if (statusIndicator) {
+            statusIndicator.setAttribute('data-status', className);
         }
+        console.log(`Status: ${message} (${className})`);
     }
 
     startSession() {

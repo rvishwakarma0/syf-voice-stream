@@ -1,16 +1,13 @@
 import AudioPlayer from "./lib/play/AudioPlayer";
 import ChatHistoryManager from "./lib/util/ChatHistoryManager.js";
-import { GET_TPO_BY_ID } from "./urlConfig.js";
 import { FeedbackManager } from './feedbackManager.js';
 
 const audioPlayer = new AudioPlayer();
 
 export class WebSocketEventManager {
-    constructor(wsUrl) {
-    const urlParams = new URLSearchParams(window.location.search);
-        this.tpodId = urlParams.get('tpodId');
-        console.log('tpodId:', this.tpodId);
+    constructor(wsUrl, callbacks = {}) {
         this.wsUrl = wsUrl;
+        this.callbacks = callbacks;
         this.promptName = null;
         this.audioContentName = null;
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -30,72 +27,66 @@ export class WebSocketEventManager {
                 this.updateChatUI();
             }
         );
-        // 🔹 Fetch system prompt/config before connecting
-        this.initialize = async () => {
-            try {
-            if (!this.tpodId) {
-                throw new Error("Missing tpodId in URL");
-            }
 
-            const response = await fetch(`${GET_TPO_BY_ID}/${this.tpodId}`);
-            if (!response.ok) {
-                throw new Error("Failed to fetch TPOD config");
-            }
-
-            const data = await response.json();
-            this.systemPromptFromTpod = data.personaPrompt;
-            
-            console.log("Fetched system prompt:", this.systemPromptFromTpod);
-
-            // ✅ Connect only after API success
-            this.connect();
-
-            } catch (error) {
-            console.error("Initialization error:", error);
-            }
-        };
-
-        this.initialize();
+        this.connect();
     }
 
     updateChatUI() {
-        const chatContainer = document.getElementById('chat-container');
-        if (!chatContainer) {
-            console.error("Chat container not found");
+        // Get the latest message from history
+        if (this.chat.history.length === 0) return;
+        
+        const latestItem = this.chat.history[this.chat.history.length - 1];
+        
+        if (latestItem.endOfConversation) {
+            this.showToast("Conversation ended", "system");
             return;
         }
 
-        // Clear existing chat messages
-        chatContainer.innerHTML = '';
+        if (latestItem.role && latestItem.message) {
+            this.showToast(latestItem.message, latestItem.role.toLowerCase());
+        }
+    }
 
-        // Add all messages from history
-        this.chat.history.forEach(item => {
-            if (item.endOfConversation) {
-                const endDiv = document.createElement('div');
-                endDiv.className = 'message system';
-                endDiv.textContent = "Conversation ended";
-                chatContainer.appendChild(endDiv);
-                return;
-            }
+    showToast(message, role) {
+        console.log(`[Toast] Showing toast - Role: ${role}, Message: ${message?.substring(0, 50)}...`);
+        
+        const toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            console.error("Toast container not found");
+            return;
+        }
 
-            if (item.role) {
-                const messageDiv = document.createElement('div');
-                const roleLowerCase = item.role.toLowerCase();
-                messageDiv.className = `message ${roleLowerCase}`;
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.className = `toast ${role}`;
 
-                const roleLabel = document.createElement('div');
-                roleLabel.className = 'role-label';
-                roleLabel.textContent = item.role;
-                messageDiv.appendChild(roleLabel);
+        // Add role label
+        const roleLabel = document.createElement('div');
+        roleLabel.className = 'toast-role';
+        roleLabel.textContent = role.toUpperCase();
+        
+        // Add message content
+        const content = document.createElement('div');
+        content.className = 'toast-content';
+        content.textContent = message || "No content";
 
-                const content = document.createElement('div');
-                content.textContent = item.message || "No content";
-                messageDiv.appendChild(content);
+        toast.appendChild(roleLabel);
+        toast.appendChild(content);
 
-                chatContainer.appendChild(messageDiv);
-            }
-        });
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+        // Add to container
+        toastContainer.appendChild(toast);
+        console.log(`[Toast] Toast added to DOM. Total toasts: ${toastContainer.children.length}`);
+
+        // Remove toast after 5 seconds
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+
+        // Limit number of toasts to 3
+        const toasts = toastContainer.querySelectorAll('.toast');
+        if (toasts.length > 3) {
+            toasts[0].remove();
+        }
     }
 
 
@@ -104,6 +95,7 @@ export class WebSocketEventManager {
             this.socket.close();
         }
         this.socket = new WebSocket(this.wsUrl);
+        this.ws = this.socket; // Expose for external access
         this.setupSocketListeners();
     }
 
@@ -111,6 +103,7 @@ export class WebSocketEventManager {
         this.socket.onopen = () => {
             console.log("WebSocket Connected");
             this.updateStatus("Connected", "connected");
+            if (this.callbacks.onConnect) this.callbacks.onConnect();
             this.isProcessing = true;
             this.startSession();
             audioPlayer.start();
@@ -128,12 +121,14 @@ export class WebSocketEventManager {
         this.socket.onerror = (error) => {
             console.error("WebSocket Error:", error);
             this.updateStatus("Connection error", "error");
+            if (this.callbacks.onError) this.callbacks.onError();
             this.isProcessing = false;
         };
 
         this.socket.onclose = (event) => {
             console.log("WebSocket Disconnected", JSON.stringify(event));
             this.updateStatus("Disconnected", "disconnected");
+            if (this.callbacks.onDisconnect) this.callbacks.onDisconnect();
             this.isProcessing = false;
             audioPlayer.stop();
             if (this.isProcessing) {
@@ -165,7 +160,7 @@ export class WebSocketEventManager {
         }
 
         const event = data.event;
-        //console.log("Event received");
+        console.log("Event received");
 
         try {
             // Handle completionStart
@@ -215,7 +210,7 @@ export class WebSocketEventManager {
             }
             // Handle audioOutput
             else if (event.audioOutput) {
-                //console.log("Audio output received");
+                console.log("Audio output received");
                 if (this.currentAudioConfig) {
                     audioPlayer.playAudio(this.base64ToFloat32Array(event.audioOutput.content));
                 }
@@ -259,17 +254,10 @@ export class WebSocketEventManager {
             this.chatHistoryManager.addTextMessage(messageData);
             
             // Track messages for sentiment feedback
-            // NOTE: In Nova Sonic, USER = trainee/agent speaking, ASSISTANT = customer/AI response
-            // So we need to SWAP the roles for our sentiment API
-            console.log("🎯 Message role detected:", data.role); // DEBUG
             if (data.role === 'USER') {
-                // USER in Nova Sonic = Agent/Trainee speaking
-                console.log("🎧 Setting AGENT message (YOU speaking) - will trigger API"); // DEBUG
-                this.feedbackManager.setAgentMessage(data.content);
-            } else if (data.role === 'ASSISTANT') {
-                // ASSISTANT in Nova Sonic = Customer/AI response
-                console.log("👤 Setting CUSTOMER message (AI/customer speaking)"); // DEBUG
                 this.feedbackManager.setCustomerMessage(data.content);
+            } else if (data.role === 'ASSISTANT') {
+                this.feedbackManager.setAgentMessage(data.content);
             }
         }
     }
@@ -291,11 +279,12 @@ export class WebSocketEventManager {
     }
 
     updateStatus(message, className) {
-        const statusDiv = document.getElementById('status');
-        if (statusDiv) {
-            statusDiv.textContent = message;
-            statusDiv.className = `status ${className}`;
+        // Update call status indicator instead of status div
+        const statusIndicator = document.getElementById('call-status');
+        if (statusIndicator) {
+            statusIndicator.setAttribute('data-status', className);
         }
+        console.log(`Status: ${message} (${className})`);
     }
 
     startSession() {
@@ -318,6 +307,26 @@ export class WebSocketEventManager {
 
     startPrompt() {
         this.promptName = crypto.randomUUID();
+        const getDefaultToolSchema = JSON.stringify({
+            "type": "object",
+            "properties": {},
+            "required": []
+        });
+
+        const getWeatherToolSchema = JSON.stringify({
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "string",
+                    "description": "Geographical WGS84 latitude of the location."
+                },
+                "longitude": {
+                    "type": "string",
+                    "description": "Geographical WGS84 longitude of the location."
+                }
+            },
+            "required": ["latitude", "longitude"]
+        });
 
         const promptStartEvent = {
             event: {
@@ -335,6 +344,30 @@ export class WebSocketEventManager {
                         encoding: "base64",
                         audioType: "SPEECH"
                     },
+                    toolUseOutputConfiguration: {
+                        mediaType: "application/json"
+                    },
+                    toolConfiguration: {
+                        tools: [{
+                            toolSpec: {
+                                name: "getDateAndTimeTool",
+                                description: "get information about the current date and current time",
+                                inputSchema: {
+                                    json: getDefaultToolSchema
+                                }
+                            }
+                        },
+                        {
+                            toolSpec: {
+                                name: "getWeatherTool",
+                                description: "Get the current weather for a given location, based on its WGS84 coordinates.",
+                                inputSchema: {
+                                    json: getWeatherToolSchema
+                                }
+                            }
+                        }
+                        ]
+                    }
                 }
             }
         };
@@ -360,12 +393,14 @@ export class WebSocketEventManager {
         };
         this.sendEvent(contentStartEvent);
 
+        const systemPrompt = "You are a credit card customer experiencing financial difficulties and payment defaults. Your role is to authentically represent the mindset, concerns, and behaviors of someone struggling with credit card debt.\n\n## Customer Profile:\n- You have accumulated significant credit card debt across multiple cards\n- You have missed several payments and are currently in default status\n- Your credit score has declined substantially due to payment history\n- You experience genuine financial stress and anxiety about your situation\n\n## Behavioral Characteristics:\n- Often avoid or delay responding to collection calls and notices\n- Feel overwhelmed by the total debt amount and minimum payment requirements\n- May make excuses or provide inconsistent explanations for missed payments\n- Show genuine concern about credit impact but feel helpless to resolve it\n- Sometimes defensive or emotional when discussing financial situation\n- May have unrealistic expectations about payment arrangements or debt forgiveness\n\n## Communication Style:\n- Express stress, frustration, or embarrassment about financial situation\n- May be evasive about specific financial details initially\n- Show willingness to resolve debt but emphasize limited financial capacity\n- Ask questions about payment options, interest rates, and credit impact\n- May negotiate for lower payments or extended terms\n\n## Scenario Context:\n- Respond as if receiving calls from collection agents, customer service, or debt counselors\n- Demonstrate realistic financial constraints and competing priorities\n- Show understanding of consequences while emphasizing genuine hardship\n- Maintain authenticity without being overly dramatic or unrealistic\n\nAlways respond in character while being respectful and realistic about the challenges faced by customers in financial distress.";
+
         const textInputEvent = {
             event: {
                 textInput: {
                     promptName: this.promptName,
                     contentName: systemContentName,
-                    content: this.systemPromptFromTpod
+                    content: systemPrompt
                 }
             }
         };

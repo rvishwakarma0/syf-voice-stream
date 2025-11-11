@@ -69,6 +69,9 @@ h1 {
   flex-direction: column;
   overflow: hidden;
   min-width: 0; /* Allow flex item to shrink below content size */
+  background: linear-gradient(to bottom, #1a1a2e 0%, #16213e 100%);
+  border-radius: 15px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 #feedback-section {
@@ -83,6 +86,139 @@ h1 {
   position: relative;
   border-left: 3px solid #dee2e6;
   margin-right: 10px;
+}
+
+/* ========================================
+   CALL INTERFACE STYLING
+   ======================================== */
+
+#call-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 8px 20px;
+  border-radius: 15px 15px 0 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#call-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.call-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  position: relative;
+  z-index: 1;
+}
+
+.call-status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.call-status-indicator[data-status="connected"] {
+  background: #4ade80;
+  animation: pulse-dot 2s infinite;
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+}
+
+.call-status-indicator[data-status="disconnected"] {
+  background: #ef4444;
+  animation: pulse-dot-red 2s infinite;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+}
+
+.call-status-indicator[data-status="error"] {
+  background: #f59e0b;
+  animation: pulse-dot-orange 2s infinite;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(74, 222, 128, 0);
+  }
+}
+
+@keyframes pulse-dot-red {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+}
+
+@keyframes pulse-dot-orange {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+  }
+}
+
+.call-title {
+  font-size: 1em;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.call-timer {
+  margin-left: auto;
+  font-size: 1em;
+  font-weight: 600;
+  color: white;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 15px;
+  font-family: 'Courier New', monospace;
+}
+
+#main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+#iframe-container {
+  flex: 1;
+  background: #000;
+  overflow: hidden;
+  position: relative;
+  height: 100%;
+}
+
+
+#call-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
 }
 
 /* ========================================
@@ -274,42 +410,93 @@ button:disabled, .button:disabled {
   opacity: 0.7;
 }
 
-/* Status styling */
-#status {
-  padding: 10px;
-  margin: 10px;
-  border-radius: 4px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
 
-.connected {
-  background-color: #dff0d8;
-  color: #3c763d;
-}
-
-.disconnected {
-  background-color: #f1d79d;
-  color: #8a6d3b;
-}
-
-.error {
-  background-color: #fcf8e3;
-  color: #a94442;
-}
-
-/* Chat container styling */
-#chat-container {
-  flex: 1;
-  overflow-y: auto;
-  border: 1px solid #ccc;
-  margin: 10px;
-  padding: 10px;
-  border-radius: 4px;
-  margin-bottom: 80px; /* Space for controls */
+/* Toast Container - Bottom Left */
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 1000;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+  pointer-events: none;
+}
+
+.toast {
+  background: rgba(255, 255, 255, 0.98);
+  padding: 12px 18px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-left: 4px solid #667eea;
+  animation: slideInLeft 0.3s ease;
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+.toast.user {
+  border-left-color: #4ade80;
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.1) 0%, rgba(255, 255, 255, 0.98) 20%);
+}
+
+.toast.assistant {
+  border-left-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(255, 255, 255, 0.98) 20%);
+}
+
+.toast.system {
+  border-left-color: #f59e0b;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(255, 255, 255, 0.98) 20%);
+}
+
+.toast-role {
+  font-weight: 700;
+  font-size: 0.75em;
+  text-transform: uppercase;
+  color: #667eea;
+  margin-bottom: 4px;
+}
+
+.toast.user .toast-role {
+  color: #4ade80;
+}
+
+.toast.assistant .toast-role {
+  color: #667eea;
+}
+
+.toast.system .toast-role {
+  color: #f59e0b;
+}
+
+.toast-content {
+  flex: 1;
+  color: #1a1a2e;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
 }
 
 /* Message styling */
@@ -377,27 +564,9 @@ button:disabled, .button:disabled {
   line-height: 1.4;
 }
 
-/* Controls styling */
-#controls {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 15px;
-  box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  z-index: 100;
-}
 
 /* Dark/light mode adaptations */
 @media (prefers-color-scheme: dark) {
-  #chat-container {
-    background-color: #1e1e1e;
-    border-color: #333;
-  }
-
   .user {
     background-color: #2c3e50;
     color: #e4e4e4;
@@ -418,27 +587,8 @@ button:disabled, .button:disabled {
     color: #b2bec3;
   }
 
-  #controls {
-    background-color: #242424;
-  }
-
   .role-label {
     color: #b2bec3;
-  }
-
-  .connected {
-    background-color: #264d33;
-    color: #a5d6a7;
-  }
-
-  .disconnected {
-    background-color: #4d3d26;
-    color: #ffe082;
-  }
-
-  .error {
-    background-color: #4d2626;
-    color: #ef9a9a;
   }
 }
 
@@ -452,14 +602,6 @@ button:disabled, .button:disabled {
   }
   button {
     background-color: #f9f9f9;
-  }
-
-  #chat-container {
-    background-color: #f9f9f9;
-  }
-
-  #controls {
-    background-color: white;
   }
 }
 
@@ -516,12 +658,6 @@ button:disabled, .button:disabled {
 @media (max-width: 480px) {
   .message {
     max-width: 90%;
-  }
-
-  #chat-container {
-    margin: 5px;
-    padding: 8px;
-    margin-bottom: 70px;
   }
 
   .button, button {

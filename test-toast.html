@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Toast Test</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<div id="app">
+  <h1>Toast Notification Test</h1>
+  <button onclick="testToast()">Show Test Toast</button>
+  
+  <div id="toast-container"></div>
+</div>
+
+<script>
+function testToast() {
+  const toastContainer = document.getElementById('toast-container');
+  
+  // Create toast element
+  const toast = document.createElement('div');
+  toast.className = 'toast user';
+
+  // Add role label
+  const roleLabel = document.createElement('div');
+  roleLabel.className = 'toast-role';
+  roleLabel.textContent = 'USER';
+  
+  // Add message content
+  const content = document.createElement('div');
+  content.className = 'toast-content';
+  content.textContent = 'This is a test message to verify toasts are working!';
+
+  toast.appendChild(roleLabel);
+  toast.appendChild(content);
+
+  // Add to container
+  toastContainer.appendChild(toast);
+  
+  console.log('Toast added! Container:', toastContainer);
+  console.log('Total toasts:', toastContainer.children.length);
+
+  // Remove toast after 5 seconds
+  setTimeout(() => {
+    toast.remove();
+  }, 5000);
+}
+
+// Auto-test on load
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    console.log('Running auto-test...');
+    testToast();
+  }, 1000);
+});
+</script>
+</body>
+</html>
