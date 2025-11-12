@@ -1,11 +1,15 @@
 import AudioPlayer from "./lib/play/AudioPlayer";
 import ChatHistoryManager from "./lib/util/ChatHistoryManager.js";
 import { FeedbackManager } from './feedbackManager.js';
+import { GET_TPO_BY_ID } from "./urlConfig.js";
 
 const audioPlayer = new AudioPlayer();
 
 export class WebSocketEventManager {
     constructor(wsUrl, callbacks = {}) {
+        const urlParams = new URLSearchParams(window.location.search);
+        this.tpodId = urlParams.get('tpodId');
+        console.log('tpodId:', this.tpodId);
         this.wsUrl = wsUrl;
         this.callbacks = callbacks;
         this.promptName = null;
@@ -29,7 +33,32 @@ export class WebSocketEventManager {
             }
         );
 
-        this.connect();
+        // 🔹 Fetch system prompt/config before connecting
+        this.initialize = async () => {
+            try {
+            if (!this.tpodId) {
+                throw new Error("Missing tpodId in URL");
+            }
+
+            const response = await fetch(`${GET_TPO_BY_ID}/${this.tpodId}`);
+            if (!response.ok) {
+                throw new Error("Failed to fetch TPOD config");
+            }
+
+            const data = await response.json();
+            this.systemPromptFromTpod = data.personaPrompt;
+
+            console.log("Fetched system prompt:", this.systemPromptFromTpod);
+
+            // ✅ Connect only after API success
+            this.connect();
+
+            } catch (error) {
+            console.error("Initialization error:", error);
+            }
+        };
+
+        this.initialize();
     }
 
     updateChatUI() {
@@ -430,14 +459,12 @@ export class WebSocketEventManager {
         };
         this.sendEvent(contentStartEvent);
 
-        const systemPrompt = "You are a credit card customer experiencing financial difficulties and payment defaults. Your role is to authentically represent the mindset, concerns, and behaviors of someone struggling with credit card debt.\n\n## Customer Profile:\n- You have accumulated significant credit card debt across multiple cards\n- You have missed several payments and are currently in default status\n- Your credit score has declined substantially due to payment history\n- You experience genuine financial stress and anxiety about your situation\n\n## Behavioral Characteristics:\n- Often avoid or delay responding to collection calls and notices\n- Feel overwhelmed by the total debt amount and minimum payment requirements\n- May make excuses or provide inconsistent explanations for missed payments\n- Show genuine concern about credit impact but feel helpless to resolve it\n- Sometimes defensive or emotional when discussing financial situation\n- May have unrealistic expectations about payment arrangements or debt forgiveness\n\n## Communication Style:\n- Express stress, frustration, or embarrassment about financial situation\n- May be evasive about specific financial details initially\n- Show willingness to resolve debt but emphasize limited financial capacity\n- Ask questions about payment options, interest rates, and credit impact\n- May negotiate for lower payments or extended terms\n\n## Scenario Context:\n- Respond as if receiving calls from collection agents, customer service, or debt counselors\n- Demonstrate realistic financial constraints and competing priorities\n- Show understanding of consequences while emphasizing genuine hardship\n- Maintain authenticity without being overly dramatic or unrealistic\n\nAlways respond in character while being respectful and realistic about the challenges faced by customers in financial distress.";
-
         const textInputEvent = {
             event: {
                 textInput: {
                     promptName: this.promptName,
                     contentName: systemContentName,
-                    content: systemPrompt
+                    content: this.systemPromptFromTpod
                 }
             }
         };
