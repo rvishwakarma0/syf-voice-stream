@@ -68,13 +68,49 @@ export class WebSocketEventManager {
         const latestItem = this.chat.history[this.chat.history.length - 1];
         
         if (latestItem.endOfConversation) {
-            this.showToast("Conversation ended", "system");
+            this.updateTranscription("Conversation ended", "system");
             return;
         }
 
         if (latestItem.role && latestItem.message) {
-            this.showToast(latestItem.message, latestItem.role.toLowerCase());
+            this.updateTranscription(latestItem.message, latestItem.role.toLowerCase());
         }
+    }
+
+    updateTranscription(message, role) {
+        const transcriptionContent = document.getElementById('transcription-content');
+        if (!transcriptionContent) {
+            console.error("Transcription content not found");
+            return;
+        }
+
+        const placeholder = transcriptionContent.querySelector('.placeholder-text');
+        if (placeholder) {
+            placeholder.remove();
+        }
+
+        let displayRole;
+        switch (role) {
+            case 'user':
+                displayRole = 'Agent';
+                break;
+            case 'assistant':
+                displayRole = 'Customer';
+                break;
+            default:
+                displayRole = 'System';
+        }
+
+        const lastLine = transcriptionContent.lastElementChild;
+        if (lastLine && lastLine.tagName === 'P' && lastLine.dataset && lastLine.dataset.role === role) {
+            lastLine.textContent = `${displayRole}: ${message || ''}`;
+        } else {
+            const line = document.createElement('p');
+            line.dataset.role = role;
+            line.textContent = `${displayRole}: ${message || ''}`;
+            transcriptionContent.appendChild(line);
+        }
+        transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
     }
 
     showToast(message, role) {
@@ -89,8 +125,8 @@ export class WebSocketEventManager {
         // Map roles to display names and IDs
         let toastId, displayName;
         if (role === 'user') {
-            toastId = 'toast-trainee';
-            displayName = 'TRAINEE';
+            toastId = 'toast-agent';
+            displayName = 'AGENT';
         } else if (role === 'assistant') {
             toastId = 'toast-customer';
             displayName = 'CUSTOMER';
@@ -267,11 +303,9 @@ export class WebSocketEventManager {
             else if (event.textOutput) {
                 console.log("Text output received:", JSON.stringify(event.textOutput));
                 const messageData = {
-                    role: this.role
+                    role: this.role,
+                    content: event.textOutput.content
                 };
-                if (messageData.role === "USER" || (messageData.role === "ASSISTANT" && this.displayAssistantText)) {
-                    messageData.content = event.textOutput.content;
-                }
                 this.handleTextOutput(messageData);
             }
             // Handle audioOutput

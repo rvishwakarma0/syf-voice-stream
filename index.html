@@ -7,36 +7,51 @@
 </head>
 <body>
 <div id="app">
-  <!-- MAIN CONTAINER WITH 80-20 SPLIT -->
+  <!-- MAIN CONTAINER WITH TOP AND BOTTOM SECTIONS -->
   <div id="main-container">
     
-    <!-- LEFT SIDE: CONVERSATION (80%) -->
-    <div id="conversation-section">
-      <!-- Call Header -->
-      <div id="call-header">
-        <div class="call-info">
-          <span class="call-status-indicator" id="call-status" data-status="disconnected"></span>
-          <span class="call-title">Live Call</span>
-          <span class="call-timer" id="call-timer">-00:20</span>
+    <!-- TOP SECTION: LEFT (CALL) + RIGHT (TRANSCRIPTION) -->
+    <div id="top-section">
+      
+      <!-- LEFT SIDE: CONVERSATION (80%) -->
+      <div id="conversation-section">
+        <!-- Call Header -->
+        <div id="call-header">
+          <div class="call-info">
+            <span class="call-status-indicator" id="call-status" data-status="disconnected"></span>
+            <span class="call-title">Live Call</span>
+            <span class="call-timer" id="call-timer">-00:20</span>
+          </div>
+        </div>
+        
+        <!-- Main Content Area with iframe -->
+        <div id="main-content">
+          <!-- Iframe Container -->
+          <div id="iframe-container">
+            <iframe 
+              id="call-iframe" 
+              src="https://rvishwakarma0.github.io/sample-synchrony-workstation/" 
+              frameborder="0"
+              allow="microphone; camera"
+              title="Call Interface">
+            </iframe>
+          </div>
         </div>
       </div>
       
-      <!-- Main Content Area with iframe -->
-      <div id="main-content">
-        <!-- Iframe Container -->
-        <div id="iframe-container">
-          <iframe 
-            id="call-iframe" 
-            src="https://rvishwakarma0.github.io/sample-synchrony-workstation/" 
-            frameborder="0"
-            allow="microphone; camera"
-            title="Call Interface">
-          </iframe>
+      <!-- RIGHT SIDE: TRANSCRIPTION (20%) -->
+      <div id="transcription-section">
+        <div class="transcription-header">
+          <span class="transcription-title">Live Transcription</span>
+        </div>
+        <div id="transcription-content" class="transcription-content">
+          <p class="placeholder-text">Transcription will appear here...</p>
         </div>
       </div>
+      
     </div>
     
-    <!-- RIGHT SIDE: FEEDBACK (20%) -->
+    <!-- BOTTOM SECTION: FEEDBACK BOXES -->
     <div id="feedback-section">
       
       <!-- UPDATE INDICATOR -->
@@ -65,7 +80,7 @@
       </div>
       
       <!-- SOP TO FOLLOW BOX -->
-      <div id="sop-box" class="feedback-box" style="display: none;">
+      <div id="sop-box" class="feedback-box">
         <div class="feedback-header">
           <span class="feedback-title">SOP to Follow</span>
         </div>
