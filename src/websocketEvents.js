@@ -36,25 +36,33 @@ export class WebSocketEventManager {
         // 🔹 Fetch system prompt/config before connecting
         this.initialize = async () => {
             try {
-            if (!this.tpodId) {
-                throw new Error("Missing tpodId in URL");
-            }
+                if (!this.tpodId) {
+                    console.warn("Missing tpodId in URL; proceeding with default system prompt");
+                    this.systemPromptFromTpod = "You are a helpful assistant.";
+                    this.connect();
+                    return;
+                }
 
-            const response = await fetch(`${GET_TPO_BY_ID}/${this.tpodId}`);
-            if (!response.ok) {
-                throw new Error("Failed to fetch TPOD config");
-            }
+                const response = await fetch(`${GET_TPO_BY_ID}/${this.tpodId}`);
+                if (!response.ok) {
+                    console.warn("Failed to fetch TPOD config; proceeding with default system prompt");
+                    this.systemPromptFromTpod = "You are a helpful assistant.";
+                    this.connect();
+                    return;
+                }
 
-            const data = await response.json();
-            this.systemPromptFromTpod = data.personaPrompt;
+                const data = await response.json();
+                this.systemPromptFromTpod = data.personaPrompt;
 
-            console.log("Fetched system prompt:", this.systemPromptFromTpod);
+                console.log("Fetched system prompt:", this.systemPromptFromTpod);
 
-            // ✅ Connect only after API success
-            this.connect();
+                // ✅ Connect only after API success
+                this.connect();
 
             } catch (error) {
-            console.error("Initialization error:", error);
+                console.error("Initialization error:", error);
+                this.systemPromptFromTpod = "You are a helpful assistant.";
+                this.connect();
             }
         };
 
@@ -63,18 +71,48 @@ export class WebSocketEventManager {
 
     updateChatUI() {
         // Get the latest message from history
-        if (this.chat.history.length === 0) return;
-        
-        const latestItem = this.chat.history[this.chat.history.length - 1];
-        
-        if (latestItem.endOfConversation) {
-            this.updateTranscription("Conversation ended", "system");
+        const transcriptionContent = document.getElementById('transcription-content');
+        if (!transcriptionContent) {
+            console.error("Transcription content not found");
             return;
         }
 
-        if (latestItem.role && latestItem.message) {
-            this.updateTranscription(latestItem.message, latestItem.role.toLowerCase());
+        if (this.chat.history.length === 0) return;
+
+        const placeholder = transcriptionContent.querySelector('.placeholder-text');
+        if (placeholder) {
+            placeholder.remove();
         }
+
+        transcriptionContent.innerHTML = '';
+
+        for (const item of this.chat.history) {
+            if (item.endOfConversation) {
+                const line = document.createElement('p');
+                line.dataset.role = 'system';
+                line.textContent = 'System: Conversation ended';
+                transcriptionContent.appendChild(line);
+                continue;
+            }
+            if (item.role && item.message) {
+                const r = String(item.role).toLowerCase();
+                let normalized = 'system';
+                if (r === 'user' || r === 'agent') normalized = 'user';
+                else if (r === 'assistant' || r === 'customer') normalized = 'assistant';
+
+                let displayRole;
+                if (normalized === 'user') displayRole = 'Agent';
+                else if (normalized === 'assistant') displayRole = 'Customer';
+                else displayRole = 'System';
+
+                const line = document.createElement('p');
+                line.dataset.role = normalized;
+                line.textContent = `${displayRole}: ${item.message || ''}`;
+                transcriptionContent.appendChild(line);
+            }
+        }
+
+        transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
     }
 
     updateTranscription(message, role) {
@@ -89,17 +127,7 @@ export class WebSocketEventManager {
             placeholder.remove();
         }
 
-        let displayRole;
-        switch (role) {
-            case 'user':
-                displayRole = 'Agent';
-                break;
-            case 'assistant':
-                displayRole = 'Customer';
-                break;
-            default:
-                displayRole = 'System';
-        }
+        let displayRole = role;
 
         const lastLine = transcriptionContent.lastElementChild;
         if (lastLine && lastLine.tagName === 'P' && lastLine.dataset && lastLine.dataset.role === role) {
@@ -112,85 +140,6 @@ export class WebSocketEventManager {
         }
         transcriptionContent.scrollTop = transcriptionContent.scrollHeight;
     }
-
-    showToast(message, role) {
-        console.log(`[Toast] Showing toast - Role: ${role}, Message: ${message?.substring(0, 50)}...`);
-        
-        const toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) {
-            console.error("Toast container not found");
-            return;
-        }
-
-        // Map roles to display names and IDs
-        let toastId, displayName;
-        if (role === 'user') {
-            toastId = 'toast-agent';
-            displayName = 'AGENT';
-        } else if (role === 'assistant') {
-            toastId = 'toast-customer';
-            displayName = 'CUSTOMER';
-        } else {
-            // Skip system messages or other roles
-            return;
-        }
-
-        // Check if toast already exists
-        let toast = document.getElementById(toastId);
-        
-        if (!toast) {
-            // Create new toast element
-            toast = document.createElement('div');
-            toast.id = toastId;
-            toast.className = `toast ${role}`;
-
-            // Add role label
-            const roleLabel = document.createElement('div');
-            roleLabel.className = 'toast-role';
-            roleLabel.textContent = displayName;
-            
-            // Add message content
-            const content = document.createElement('div');
-            content.className = 'toast-content';
-            content.textContent = message || "No content";
-
-            toast.appendChild(roleLabel);
-            toast.appendChild(content);
-
-            // Add to container
-            toastContainer.appendChild(toast);
-            console.log(`[Toast] Created new ${displayName} toast`);
-        } else {
-            // Update existing toast content
-            const content = toast.querySelector('.toast-content');
-            if (content) {
-                content.textContent = message || "No content";
-                console.log(`[Toast] Updated ${displayName} toast content`);
-                
-                // Add update animation
-                toast.classList.remove('toast-update');
-                void toast.offsetWidth; // Trigger reflow
-                toast.classList.add('toast-update');
-            }
-        }
-
-        // Clear existing timeout for this toast
-        if (this.toastTimers[toastId]) {
-            clearTimeout(this.toastTimers[toastId]);
-        }
-
-        // Set new timeout to remove toast after 10 seconds
-        this.toastTimers[toastId] = setTimeout(() => {
-            if (toast && toast.parentNode) {
-                toast.classList.add('toast-fadeout');
-                setTimeout(() => {
-                    toast.remove();
-                    delete this.toastTimers[toastId];
-                }, 300); // Wait for fade animation
-            }
-        }, 10000);
-    }
-
 
     connect() {
         if (this.socket) {
@@ -285,28 +234,33 @@ export class WebSocketEventManager {
                             console.log("Additional model fields:", event.contentStart.additionalModelFields)
                             const additionalFields = JSON.parse(event.contentStart.additionalModelFields);
                             isSpeculative = additionalFields.generationStage === "SPECULATIVE";
-                            if (isSpeculative) {
-                                console.log("Received speculative content");
-                                this.displayAssistantText = true;
-                            }
-                            else {
-                                this.displayAssistantText = false;
-                            }
+                            this.displayAssistantText = !isSpeculative;
+                        }
+                        else {
+                            this.displayAssistantText = true;
                         }
                     } catch (e) {
                         console.error("Error parsing additionalModelFields:", e);
                     }
+                    // New TEXT generation started: close previous turn so upcoming text outputs start a new entry
+                    this.chatHistoryManager.endTurn();
                 }
 
             }
             // Handle textOutput
             else if (event.textOutput) {
-                console.log("Text output received:", JSON.stringify(event.textOutput));
-                const messageData = {
-                    role: this.role,
-                    content: event.textOutput.content
-                };
-                this.handleTextOutput(messageData);
+                console.log("Text output received 1234:", JSON.stringify(event));
+                if(this.displayAssistantText){
+                    const messageData = {
+                        role: this.role,
+                        content: event.textOutput.content
+                    };
+                    this.handleTextOutput(messageData);
+                }
+                else{
+                    console.log("Skipping speculative text output");
+                }
+                
             }
             // Handle audioOutput
             else if (event.audioOutput) {
@@ -320,12 +274,15 @@ export class WebSocketEventManager {
                 console.log("Content end received:", JSON.stringify(event.contentEnd));
                 switch (event.contentEnd.type) {
                     case "TEXT":
-                        if (event.contentEnd.stopReason.toUpperCase() === "END_TURN") {
-                            this.chatHistoryManager.endTurn();
-                        }
-                        else if (event.contentEnd.stopReason.toUpperCase() === "INTERRUPTED") {
+                        if (event.contentEnd.stopReason && event.contentEnd.stopReason.toUpperCase() === "INTERRUPTED") {
                             audioPlayer.bargeIn();
                         }
+                        // Close TEXT turn regardless of stopReason to ensure history advances
+                        this.chatHistoryManager.endTurn();
+                        break;
+                    case "AUDIO":
+                        // Always close AUDIO turn to finalize user's speaking turn
+                        this.chatHistoryManager.endTurn();
                         break;
                     default:
                         console.log("Received content end for type:", JSON.stringify(event.contentEnd.type));
@@ -352,12 +309,11 @@ export class WebSocketEventManager {
                 message: data.content
             };
             this.chatHistoryManager.addTextMessage(messageData);
-            
             // Track messages for sentiment feedback
             if (data.role === 'USER') {
-                this.feedbackManager.setCustomerMessage(data.content);
-            } else if (data.role === 'ASSISTANT') {
                 this.feedbackManager.setAgentMessage(data.content);
+            } else if (data.role === 'ASSISTANT') {
+                this.feedbackManager.setCustomerMessage(data.content);
             }
         }
     }

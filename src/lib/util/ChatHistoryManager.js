@@ -26,24 +26,37 @@ class ChatHistoryManager {
         if (!this.chatRef || !this.setChat) {
             console.error("ChatHistoryManager: chatRef or setChat is not initialized");
             return;
+        } 
+        if(content.role === 'USER') {
+            content.role = 'Agent';
+        }else{
+            content.role = 'Customer';
         }
-
         let history = this.chatRef.current?.history || [];
         let updatedChatHistory = [...history];
         let lastTurn = updatedChatHistory[updatedChatHistory.length - 1];
 
-        if (lastTurn !== undefined && lastTurn.role === content.role) {
-            // Same role, append to the last turn
+        console.log(
+            "[ChatHistoryManager] addTextMessage in:",
+            { incomingRole: content.role, prevLength: updatedChatHistory.length, lastRole: lastTurn?.role, lastEnded: lastTurn?.endOfResponse }
+        );
+
+        if (
+            lastTurn !== undefined &&
+            lastTurn.role === content.role &&
+            lastTurn.endOfResponse !== true
+        ) {
             updatedChatHistory[updatedChatHistory.length - 1] = {
-                ...content,
+                ...lastTurn,
                 message: lastTurn.message + " " + content.message
             };
         }
         else {
-            // Different role, add a new turn
+            
             updatedChatHistory.push({
                 role: content.role,
-                message: content.message
+                message: content.message,
+                mid: crypto.randomUUID()
             });
         }
 
@@ -51,6 +64,7 @@ class ChatHistoryManager {
             history: updatedChatHistory
         });
 
+        console.log("Updated chat history 1234:", updatedChatHistory);
         window.parent.postMessage({
             type: 'chatHistory',
             data: JSON.stringify(updatedChatHistory)
@@ -64,12 +78,16 @@ class ChatHistoryManager {
         }
 
         let history = this.chatRef.current?.history || [];
-        let updatedChatHistory = history.map(item => {
-            return {
-                ...item,
+        let updatedChatHistory = [...history];
+        if (updatedChatHistory.length > 0) {
+            console.log("[ChatHistoryManager] endTurn before:", { length: updatedChatHistory.length, lastRole: updatedChatHistory[updatedChatHistory.length - 1].role });
+            const i = updatedChatHistory.length - 1;
+            updatedChatHistory[i] = {
+                ...updatedChatHistory[i],
                 endOfResponse: true
             };
-        });
+            console.log("[ChatHistoryManager] endTurn after mark:", { length: updatedChatHistory.length });
+        }
 
         this.setChat({
             history: updatedChatHistory
